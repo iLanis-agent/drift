@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drift - ambient focus mixer</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; background:#070d16; color:#e8f1ff; min-height:100vh; }
+  .wrap { max-width:720px; margin:0 auto; padding:22px 16px 60px; }
+  header { text-align:center; margin-bottom:8px; }
+  h1 { font-size:26px; font-weight:800; letter-spacing:.5px; }
+  h1 .d { color:#5eead4; }
+  .tag { color:#8aa0bf; font-size:13px; margin-top:4px; }
+  #bigplay { display:block; margin:22px auto 6px; width:120px; height:120px; border-radius:50%; border:none; cursor:pointer;
+    background:radial-gradient(circle at 35% 30%, #2dd4bf, #0e7490); color:#04202a; font-size:38px; box-shadow:0 0 44px #2dd4bf55; transition:transform .15s; }
+  #bigplay:hover { transform:scale(1.05); }
+  #state { text-align:center; color:#8aa0bf; font-size:13px; min-height:18px; }
+  #vizwrap { background:#0b1524; border:1px solid #1b2c44; border-radius:14px; margin:18px 0; padding:10px; }
+  canvas { display:block; width:100%; height:90px; }
+  .channels { display:flex; flex-direction:column; gap:10px; }
+  .ch { display:grid; grid-template-columns:44px 110px 1fr 46px; gap:12px; align-items:center; background:#0b1524; border:1px solid #1b2c44; border-radius:12px; padding:12px 16px; }
+  .ch .ic { font-size:24px; }
+  .ch .nm { font-size:14px; font-weight:600; }
+  .ch input[type=range] { width:100%; accent-color:#2dd4bf; height:26px; }
+  .ch .pct { font-size:12px; color:#8aa0bf; text-align:right; font-variant-numeric:tabular-nums; }
+  .timers { display:flex; gap:8px; justify-content:center; margin-top:22px; flex-wrap:wrap; }
+  .timers button { background:#0b1524; border:1px solid #1b2c44; color:#c9d8ee; border-radius:9px; padding:8px 16px; font-size:13px; cursor:pointer; }
+  .timers button:hover { border-color:#2dd4bf; }
+  .timers button.on { background:#134e4a; border-color:#2dd4bf; color:#5eead4; }
+  #tleft { text-align:center; font-size:12px; color:#5eead4; margin-top:8px; min-height:16px; font-variant-numeric:tabular-nums; }
+  footer { text-align:center; color:#4c5f7d; font-size:12px; margin-top:28px; }
+  footer a { color:#8aa0bf; text-decoration:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><span class="d">~</span> Drift</h1>
+    <p class="tag">an ambient mixer for deep focus - every sound synthesized live in your browser</p>
+  </header>
+  <button id="bigplay" title="Start">&#9654;</button>
+  <div id="state">tap to start the soundscape</div>
+  <div id="vizwrap"><canvas id="viz"></canvas></div>
+  <div class="channels" id="channels"></div>
+  <div class="timers" id="timers">
+    <span style="align-self:center;font-size:13px;color:#8aa0bf">sleep timer:</span>
+    <button data-min="15">15m</button><button data-min="30">30m</button>
+    <button data-min="45">45m</button><button data-min="60">60m</button>
+    <button data-min="0">off</button>
+  </div>
+  <div id="tleft"></div>
+  <footer><a href="index.html">&#8592; About</a> &nbsp;|&nbsp; Drift &middot; idea #2 from the iLanis App Factory</footer>
+</div>
+<script>
+var DEFS=[
+ {id:'rain',  name:'Rain',    icon:'\u{1F327}', color:'#60a5fa', def:0.55},
+ {id:'thunder',name:'Thunder',icon:'\u26C8',     color:'#a78bfa', def:0.25},
+ {id:'wind',  name:'Wind',    icon:'\u{1F32C}',  color:'#7dd3fc', def:0.35},
+ {id:'fire',  name:'Fire',    icon:'\u{1F525}',  color:'#fb923c', def:0.30},
+ {id:'waves', name:'Waves',   icon:'\u{1F30A}',  color:'#2dd4bf', def:0.40}
+];
+var ctx=null, master=null, analyser=null, running=false, chans={}, timer=null, timerEnd=0, tickInt=null, modInt=null;
+function makeNoiseBuffer(c, brown){
+  var len=c.sampleRate*3, b=c.createBuffer(1,len,c.sampleRate), d=b.getChannelData(0), last=0, i;
+  for(i=0;i<len;i++){ var w=Math.random()*2-1;
+    if(brown){ last=(last+0.02*w)/1.02; d[i]=last*3.5; } else d[i]=w; }
+  return b;
+}
+function src(buf){ var s=ctx.createBufferSource(); s.buffer=buf; s.loop=true; s.start(); return s; }
+function build(){
+  ctx=new (window.AudioContext||window.webkitAudioContext)();
+  master=ctx.createGain(); master.gain.value=0.9;
+  analyser=ctx.createAnalyser(); analyser.fftSize=128;
+  master.connect(analyser); analyser.connect(ctx.destination);
+  var white=makeNoiseBuffer(ctx,false), brown=makeNoiseBuffer(ctx,true);
+  function chain(){ var g=ctx.createGain(); g.gain.value=0; g.connect(master); return g; }
+  // rain
+  var rhp=ctx.createBiquadFilter(); rhp.type='highpass'; rhp.frequency.value=500;
+  var rlp=ctx.createBiquadFilter(); rlp.type='lowpass'; rlp.frequency.value=2600;
+  var rg=chain(); src(white).connect(rhp); rhp.connect(rlp); rlp.connect(rg);
+  // thunder
+  var tlp=ctx.createBiquadFilter(); tlp.type='lowpass'; tlp.frequency.value=110;
+  var tg=chain(); src(brown).connect(tlp); tlp.connect(tg);
+  // wind
+  var wbp=ctx.createBiquadFilter(); wbp.type='bandpass'; wbp.frequency.value=500; wbp.Q.value=1.4;
+  var wg=chain(); src(brown).connect(wbp); wbp.connect(wg);
+  // fire: bright crackle + warm base
+  var fhp=ctx.createBiquadFilter(); fhp.type='highpass'; fhp.frequency.value=2000;
+  var fg1=ctx.createGain(); fg1.gain.value=0.5; var fg=chain();
+  src(white).connect(fhp); fhp.connect(fg1); fg1.connect(fg);
+  var flp=ctx.createBiquadFilter(); flp.type='lowpass'; flp.frequency.value=380;
+  var fg2=ctx.createGain(); fg2.gain.value=0.6; src(brown).connect(flp); flp.connect(fg2); fg2.connect(fg);
+  // waves
+  var vlp=ctx.createBiquadFilter(); vlp.type='lowpass'; vlp.frequency.value=700;
+  var vg1=ctx.createGain(); vg1.gain.value=0.7; var vg=chain();
+  src(brown).connect(vlp); vlp.connect(vg1); vg1.connect(vg);
+  chans={ rain:{g:rg}, thunder:{g:tg}, wind:{g:wg,bp:wbp}, fire:{g:fg,crackle:fg1}, waves:{g:vg,swell:vg1} };
+  modInt=setInterval(modulate,300);
+}
+function ramp(param,v,t){ param.cancelScheduledValues(ctx.currentTime); param.setTargetAtTime(v,ctx.currentTime,t||0.25); }
+function modulate(){
+  if(!running) return;
+  var t=ctx.currentTime, c=chans;
+  // thunder swells: mostly quiet, occasional boom
+  if(Math.random()<0.06){ c.thunder.g.gain.setTargetAtTime(c.thunder.level*1.8,t,1.2); }
+  else { c.thunder.g.gain.setTargetAtTime(c.thunder.level*0.55,t,0.8); }
+  // wind gusts + wandering bandpass
+  c.wind.bp.frequency.setTargetAtTime(300+Math.random()*700,t,1.5);
+  c.wind.g.gain.setTargetAtTime(c.wind.level*(0.5+Math.random()*0.7),t,0.9);
+  // fire crackle spikes
+  if(Math.random()<0.35){ c.fire.crackle.gain.setTargetAtTime(Math.random()*1.4,t,0.04); }
+  else { c.fire.crackle.gain.setTargetAtTime(0.25,t,0.12); }
+  // waves slow swell
+  var ph=Math.sin(t*0.45)*0.5+0.5;
+  c.waves.swell.gain.setTargetAtTime(0.35+ph*0.75,t,0.3);
+}
+function levels(){
+  DEFS.forEach(function(d){
+    var el=document.getElementById('vol-'+d.id);
+    var v=el.value/100;
+    document.getElementById('pct-'+d.id).textContent=el.value+'%';
+    if(chans[d.id]){ chans[d.id].level=v*0.9;
+      if(d.id==='rain'||d.id==='fire') ramp(chans[d.id].g.gain, v*0.9*(d.id==='fire'?0.8:1), 0.2);
+      if(d.id==='waves') ramp(chans[d.id].g.gain, v*0.9, 0.2);
+    }
+  });
+}
+function draw(){
+  requestAnimationFrame(draw);
+  var cv=document.getElementById('viz'), g=cv.getContext('2d');
+  var w=cv.width=cv.clientWidth, h=cv.height=cv.clientHeight;
+  g.clearRect(0,0,w,h);
+  if(!analyser||!running){ g.fillStyle='#1b2c44'; g.fillRect(0,h/2-1,w,2); return; }
+  var data=new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteFrequencyData(data);
+  var n=data.length, bw=w/n, i;
+  for(i=0;i<n;i++){ var v=data[i]/255, bh=v*(h-6);
+    g.fillStyle='rgba(45,212,191,'+(0.25+v*0.75)+')';
+    g.fillRect(i*bw+1,h-bh-3,bw-2,bh); }
+}
+var bp=document.getElementById('bigplay'), st=document.getElementById('state');
+bp.onclick=function(){
+  if(!running){
+    if(!ctx) build();
+    ctx.resume(); running=true;
+    DEFS.forEach(function(d){ var c=chans[d.id]; c.level=(document.getElementById('vol-'+d.id).value/100)*0.9; });
+    levels();
+    bp.innerHTML='&#9646;&#9646;'; st.textContent='drifting...';
+  } else {
+    stopAll(); st.textContent='paused - tap to drift again';
+  }
+};
+function stopAll(){
+  running=false;
+  if(master) master.gain.setTargetAtTime(0, ctx.currentTime, 0.15);
+  setTimeout(function(){ if(!running&&ctx) ctx.suspend(); },700);
+  bp.innerHTML='&#9654;';
+  clearTimer();
+}
+var chHtml=DEFS.map(function(d){
+  return '<div class="ch"><span class="ic">'+d.icon+'</span><span class="nm">'+d.name+'</span>'+
+  '<input type="range" id="vol-'+d.id+'" min="0" max="100" value="'+Math.round(d.def*100)+'">'+
+  '<span class="pct" id="pct-'+d.id+'">'+Math.round(d.def*100)+'%</span></div>';
+}).join('');
+document.getElementById('channels').innerHTML=chHtml;
+DEFS.forEach(function(d){ document.getElementById('vol-'+d.id).addEventListener('input',levels); });
+document.querySelectorAll('#timers button').forEach(function(b){
+  b.onclick=function(){
+    document.querySelectorAll('#timers button').forEach(function(x){x.classList.remove('on');});
+    clearTimer();
+    var m=parseInt(b.dataset.min,10);
+    if(m>0){ b.classList.add('on');
+      timerEnd=Date.now()+m*60000;
+      timer=setTimeout(function(){ fadeOutStop(); }, m*60000);
+      tickInt=setInterval(showLeft,1000); showLeft();
+    }
+  };
+});
+function showLeft(){ var s=Math.max(0,Math.round((timerEnd-Date.now())/1000));
+  var mm=Math.floor(s/60), ss=s%60;
+  document.getElementById('tleft').textContent='fades out in '+mm+':'+String(ss).padStart(2,'0'); }
+function fadeOutStop(){
+  if(!ctx) return;
+  master.gain.setTargetAtTime(0, ctx.currentTime, 3);
+  document.getElementById('tleft').textContent='fading out...';
+  setTimeout(stopAll, 12000);
+}
+function clearTimer(){ if(timer){clearTimeout(timer);timer=null;} if(tickInt){clearInterval(tickInt);tickInt=null;}
+  document.getElementById('tleft').textContent=''; if(master&&running) master.gain.setTargetAtTime(0.9, ctx.currentTime, 0.3); }
+draw();
+</script>
+</body>
+</html>
