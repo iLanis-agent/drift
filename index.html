@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drift - an ambient mixer for deep focus</title>
+<meta name="description" content="Drift mixes rain, thunder, wind, fire and waves into your perfect focus soundscape - every sound synthesized live in your browser.">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; background:#070d16; color:#e8f1ff; min-height:100vh; }
+  .hero { min-height:92vh; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:40px 20px;
+    background:radial-gradient(ellipse 75% 50% at 50% 110%, #0d948855 0%, #0e749030 40%, transparent 70%); }
+  .badge { font-size:12px; letter-spacing:2px; text-transform:uppercase; color:#5eead4; border:1px solid #134e4a; border-radius:999px; padding:6px 16px; margin-bottom:26px; }
+  h1 { font-size:clamp(40px,8vw,74px); font-weight:800; line-height:1.06;
+    background:linear-gradient(120deg,#99f6e4,#2dd4bf 45%,#0ea5e9); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .sub { font-size:clamp(16px,2.4vw,21px); color:#8aa0bf; max-width:580px; margin-top:20px; line-height:1.55; }
+  .cta { margin-top:38px; display:inline-block; background:linear-gradient(135deg,#14b8a6,#0284c7); color:#fff; font-size:18px; font-weight:700;
+    padding:16px 44px; border-radius:14px; text-decoration:none; box-shadow:0 10px 34px #14b8a640; transition:transform .15s ease; }
+  .cta:hover { transform:translateY(-2px); }
+  .feats { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; max-width:900px; margin:0 auto; padding:20px 20px 70px; }
+  .f { background:#0b1524; border:1px solid #1b2c44; border-radius:14px; padding:22px; }
+  .f .ic { font-size:26px; }
+  .f h3 { font-size:16px; margin:10px 0 6px; }
+  .f p { font-size:14px; color:#8aa0bf; line-height:1.5; }
+  footer { text-align:center; color:#4c5f7d; font-size:13px; padding:26px; border-top:1px solid #12203a; }
+  footer a { color:#8aa0bf; }
+</style>
+</head>
+<body>
+  <section class="hero">
+    <div class="badge">iLanis App Factory &middot; idea #2</div>
+    <h1>Build your weather.<br>Focus inside it.</h1>
+    <p class="sub">Drift mixes rain, thunder, wind, fire and waves into a soundscape that's yours alone. No tracks, no loops, no downloads - every sound is synthesized live in your browser, so it never repeats and never ends.</p>
+    <a class="cta" href="app.html">Open the mixer</a>
+  </section>
+  <section class="feats">
+    <div class="f"><div class="ic">&#127783;</div><h3>Five living sounds</h3><p>Rain, thunder, wind, fire and waves - each one generated in real time with the Web Audio API. Blend them with sliders.</p></div>
+    <div class="f"><div class="ic">&#9201;</div><h3>Sleep timer</h3><p>Set 15 to 60 minutes and Drift slowly fades itself out while you fall asleep or finish a session.</p></div>
+    <div class="f"><div class="ic">&#128202;</div><h3>Live visualizer</h3><p>A real-time frequency readout of your mix, so you can see the soundscape breathe.</p></div>
+    <div class="f"><div class="ic">&#9889;</div><h3>Zero weight</h3><p>No accounts, no audio files, no tracking. Open the page and it plays - that's the whole app.</p></div>
+  </section>
+  <footer>No sign-up. No tracking. Everything runs in your browser.<br>
+  Built by the <a href="https://ilanis-agent.github.io/app-factory/">iLanis App Factory</a> &middot; <a href="https://github.com/iLanis-agent/drift">source on GitHub</a></footer>
+</body>
+</html>
